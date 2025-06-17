@@ -55,7 +55,7 @@ struct ContentView: View {
 //            背景色
             Color("body_bg").edgesIgnoringSafeArea(.all)
             
-//            ゲーム画面
+//            背景のマスの描画
             VStack {
                 ForEach(0..<BOARD_SIZE, id: \.self) { i in
                     HStack {
@@ -76,15 +76,25 @@ struct ContentView: View {
             .fontDesign(.monospaced)
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             
+//            アニメーションテスト用ボタン
+            Button("aaa") {
+                moveCellTo(id: 3, x: 3, y: 3)
+            }
+            
+//            数字のあるマスの描画
             ForEach(0..<Cells.count, id: \.self) { i in
                 let cell = Cells[i]
+                
+//                盤の真ん中を取得
                 let center = Double(BOARD_SIZE - 1) / 2
+                
+//                マスの(x, y)をもとに位置を計算
                 let posX = -((CELL_SIZE + CELL_TEXT_SIZE) / 2) * CGFloat(center - Double(cell.x)) * 2
                 let posY = -((CELL_SIZE + CELL_TEXT_SIZE) / 2) * CGFloat(center - Double(cell.y)) * 2
                 
+//                数字が存在するマスを上から描画
                 ZStack {
                     Text(String(cell.number))
-//                    .shadow(color: .black.opacity(0.2), radius: 1, x: 1, y: 1)
                     .frame(width: CELL_SIZE, height: CELL_SIZE, alignment: .center)
                     .padding(CELL_PADDING)
                     .foregroundColor(cell.number  < 8 ? Color("cell_text_black") : Color("cell_text_white"))
@@ -96,6 +106,16 @@ struct ContentView: View {
                     .lineLimit(1)
                     .offset(x: posX, y: posY)
                 }
+            }
+        }
+    }
+    
+//    アニメーション付きでマスを移動する関数
+    func moveCellTo(id: Int, x: Int, y: Int) {
+        if let index = Cells.firstIndex(where: { $0.id == id }) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                Cells[index].x = x
+                Cells[index].y = y
             }
         }
     }

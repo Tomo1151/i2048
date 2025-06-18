@@ -27,11 +27,11 @@ struct ContentView: View {
     @State private var generatedId: Int = 0
     
 //    盤面チェック用配列
-    @State private var board: [Int?] = [
-        4, nil, nil, nil,
-        nil, nil, nil, 2,
-        nil, nil, nil, nil,
-        nil, nil, nil, nil,
+    @State private var board: [[Int?]] = [
+        [nil, nil, nil, nil],
+        [nil, nil, nil, nil],
+        [nil, nil, nil, nil],
+        [nil, nil, nil, nil],
     ]
     
 //    既に数字のあるマスの一覧 (アニメーション用)
@@ -48,7 +48,7 @@ struct ContentView: View {
         Cell(id: 9, number: 1024, x: 1, y: 2),
         Cell(id: 10, number: 2048, x: 2, y: 2),
     ]
-    
+        
 //    メインビュー
     var body: some View {
         ZStack {
@@ -77,9 +77,9 @@ struct ContentView: View {
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             
 //            アニメーションテスト用ボタン
-            Button("aaa") {
-                moveCellTo(id: 3, x: 3, y: 3)
-            }
+//            Button("aaa") {
+//                moveCellTo(id: 3, x: 3, y: 3)
+//            }
             
 //            数字のあるマスの描画
             ForEach(0..<Cells.count, id: \.self) { i in
@@ -108,6 +108,23 @@ struct ContentView: View {
                 }
             }
         }
+        .gesture(
+            DragGesture()
+                .onEnded { gesture in
+//                    スワイプの検知
+                    handleSwipe(translationX: gesture.translation.width, translationY: gesture.translation.height)
+                }
+        )
+    }
+    
+    func generateRandomPosition() -> Int {
+        return Int.random(in: 0..<BOARD_SIZE)
+    }
+    
+    func addCell(value: Int, x: Int, y: Int) -> Void {
+        board[y][x] = value
+        Cells.append(Cell(id: generatedId, number: value, x: x, y: y))
+        generatedId += 1
     }
     
 //    アニメーション付きでマスを移動する関数
@@ -116,6 +133,32 @@ struct ContentView: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 Cells[index].x = x
                 Cells[index].y = y
+            }
+        }
+    }
+    
+//    画面スワイプのハンドラ
+    func handleSwipe(translationX: CGFloat, translationY: CGFloat) -> Void {
+        if abs(translationX) > abs(translationY) {
+//                        水平方向
+            if translationX > 0 {
+//                            右
+                print("右にスワイプされました")
+                addCell(value: 2, x: generateRandomPosition(), y: generateRandomPosition())
+            } else {
+//                            左
+                print("左にスワイプされました")
+                addCell(value: 2, x: generateRandomPosition(), y: generateRandomPosition())
+            }
+        } else {
+            if translationY > 0 {
+//                            下
+                print("下にスワイプされました")
+                addCell(value: 2, x: generateRandomPosition(), y: generateRandomPosition())
+            } else {
+//                            上
+                print("上にスワイプされました")
+                addCell(value: 2, x: generateRandomPosition(), y: generateRandomPosition())
             }
         }
     }

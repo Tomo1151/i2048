@@ -146,7 +146,7 @@ struct ContentView: View {
                 let y = Int.random(in: 0..<BOARD_SIZE)
                 
                 if !Cells.contains(where: { cell in cell.x == x && cell.y == y }) {
-                    let cell = Cell(id: generatedId, number: Double.random(in: 0...1) < RANDOM_NUMBER_CHANCE ? 2 : 4, x: x, y: Int.random(in: 0..<BOARD_SIZE))
+                    let cell = Cell(id: generatedId, number: Double.random(in: 0...1) < RANDOM_NUMBER_CHANCE ? 2 : 4, x: x, y: y)
                     Cells.append(cell)
                     generatedId += 1
                     break
@@ -236,31 +236,30 @@ struct ContentView: View {
             .sorted(by: sortClosureMap[direction]!)
     }
     
-    func mergeCells(merge: [MergeData], direction: Direction, line: Int) {
-        if merge.count == 0 {
-            alignCells(direction: direction, line: line)
-            return
-        }
+    func mergeCells(direction: Direction) {
+        for i in 0..<BOARD_SIZE {
+            let merged = move(direction: direction, line: i)
+            
+            if merged.count == 0 {
+                alignCells(direction: direction, line: i)
+                continue
+            }
         
-        for i in 0..<merge.count {
-            let cellFrom = findCellById(id: merge[i].FromId)!
-            let cellTo = findCellById(id: merge[i].ToId)!
+            for i in 0..<merged.count {
+                let cellFrom = findCellById(id: merged[i].FromId)!
+                let cellTo = findCellById(id: merged[i].ToId)!
 
-//            moveCellTo(id: cellFrom.id, x: cellTo.x, y: cellTo.y)
-////            マスの数字を結合し，マスの配列から削除
-//            if let cellIndex = findCellIndexById(id: cellTo.id) {
-//                Cells[cellIndex].number *= 2
-//                deleteCellById(id: cellFrom.id)
-//            }
-            moveCellTo(id: cellFrom.id, x: cellTo.x, y: cellTo.y, onFinish: {
-//                マスの数字を結合し，マスの配列から削除
-                if let cellIndex = findCellIndexById(id: cellTo.id) {
-                    Cells[cellIndex].number *= 2
-                    deleteCellById(id: cellFrom.id)
-                    alignCells(direction: direction, line: line)
-                }
-            })
+                moveCellTo(id: cellFrom.id, x: cellTo.x, y: cellTo.y, onFinish: {
+//                    マスの数字を結合し，マスの配列から削除
+                    if let cellIndex = findCellIndexById(id: cellTo.id) {
+                        Cells[cellIndex].number *= 2
+                        deleteCellById(id: cellFrom.id)
+                        alignCells(direction: direction, line: i)
+                    }
+                })
+            }
         }
+        generateRandomCell(count: 1)
     }
 
 //    アニメーション付きでマスを移動する関数
@@ -321,13 +320,9 @@ struct ContentView: View {
             }
         }
         
-        for i in 0..<BOARD_SIZE {
-            var merged = move(direction: swipeDirection, line: i)
+
 //            print("\(i+1)行目：\(merged)")
-            mergeCells(merge: merged, direction: swipeDirection, line: i)
-        }
-        
-        generateRandomCell(count: 1)
+            mergeCells(direction: swipeDirection)
     }
 }
 

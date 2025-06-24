@@ -33,35 +33,36 @@ struct ContentView: View {
     let CELL_SIZE: CGFloat = 50
     let CELL_PADDING: CGFloat = 12
     let CELL_TEXT_SIZE: CGFloat = 32
+    let RANDOM_NUMBER_CHANCE: Double = 0.9
     
 //    次に割り振るID (連番)
     @State private var generatedId: Int = 0
     
-//    盤面チェック用配列
-    @State private var board: [[Int?]] = [
-        [nil, nil, nil, nil],
-        [nil, nil, nil, nil],
-        [nil, nil, nil, nil],
-        [nil, nil, nil, nil],
-    ]
+////    盤面チェック用配列
+//    @State private var board: [[Int?]] = [
+//        [nil, nil, nil, nil],
+//        [nil, nil, nil, nil],
+//        [nil, nil, nil, nil],
+//        [nil, nil, nil, nil],
+//    ]
     
 //    既に数字のあるマスの一覧 (アニメーション用)
     @State private var Cells: [Cell] = [
-        Cell(id: 0, number: 2, x: 0, y: 0),
-        Cell(id: 1, number: 4, x: 1, y: 0),
-        Cell(id: 2, number: 4, x: 2, y: 0),
-        Cell(id: 3, number: 16, x: 3, y: 0),
-        Cell(id: 4, number: 32, x: 0, y: 1),
-        Cell(id: 5, number: 32, x: 1, y: 1),
-        Cell(id: 6, number: 128, x: 2, y: 1),
-        Cell(id: 7, number: 256, x: 3, y: 1),
-        Cell(id: 8, number: 512, x: 0, y: 2),
-        Cell(id: 9, number: 32, x: 1, y: 2),
-        Cell(id: 10, number: 2048, x: 2, y: 2),
-        Cell(id: 11, number: 2, x: 0, y: 3),
-        Cell(id: 12, number: 2, x: 1, y: 3),
-        Cell(id: 13, number: 2, x: 2, y: 3),
-        Cell(id: 14, number: 2, x: 3, y: 3),
+//        Cell(id: 0, number: 2, x: 0, y: 0),
+//        Cell(id: 1, number: 4, x: 1, y: 0),
+//        Cell(id: 2, number: 4, x: 2, y: 0),
+//        Cell(id: 3, number: 16, x: 3, y: 0),
+//        Cell(id: 4, number: 32, x: 0, y: 1),
+//        Cell(id: 5, number: 32, x: 1, y: 1),
+//        Cell(id: 6, number: 128, x: 2, y: 1),
+//        Cell(id: 7, number: 256, x: 3, y: 1),
+//        Cell(id: 8, number: 512, x: 0, y: 2),
+//        Cell(id: 9, number: 32, x: 1, y: 2),
+//        Cell(id: 10, number: 2048, x: 2, y: 2),
+//        Cell(id: 11, number: 2, x: 0, y: 3),
+//        Cell(id: 12, number: 2, x: 1, y: 3),
+//        Cell(id: 13, number: 2, x: 2, y: 3),
+//        Cell(id: 14, number: 2, x: 3, y: 3),
     ]
         
 //    メインビュー
@@ -130,19 +131,36 @@ struct ContentView: View {
                     handleSwipe(translationX: gesture.translation.width, translationY: gesture.translation.height)
                 }
         )
+        .onAppear {
+            if Cells.isEmpty {
+                generateRandomCell(count: 2)
+            }
+        }
     }
     
 //    マスのインデックス内の乱数を生成
-    func generateRandomPosition() -> Int {
-        return Int.random(in: 0..<BOARD_SIZE)
+    func generateRandomCell(count: Int) {
+        for i in 0..<count {
+            while (true) {
+                let x = Int.random(in: 0..<BOARD_SIZE)
+                let y = Int.random(in: 0..<BOARD_SIZE)
+                
+                if !Cells.contains(where: { cell in cell.x == x && cell.y == y }) {
+                    let cell = Cell(id: generatedId, number: Double.random(in: 0...1) < RANDOM_NUMBER_CHANCE ? 2 : 4, x: x, y: Int.random(in: 0..<BOARD_SIZE))
+                    Cells.append(cell)
+                    generatedId += 1
+                    break
+                }
+            }
+        }
     }
     
 //    数字のマスを追加
-    func addCell(value: Int, x: Int, y: Int) -> Void {
-        board[y][x] = value
-        Cells.append(Cell(id: generatedId, number: value, x: x, y: y))
-        generatedId += 1
-    }
+//    func addCell(value: Int, x: Int, y: Int) -> Void {
+//        board[y][x] = value
+//        Cells.append(Cell(id: generatedId, number: value, x: x, y: y))
+//        generatedId += 1
+//    }
     
 //    指定した方向へ指定したラインを動かす
     func move(direction: Direction, line: Int) -> [MergeData] {
@@ -308,6 +326,8 @@ struct ContentView: View {
 //            print("\(i+1)行目：\(merged)")
             mergeCells(merge: merged, direction: swipeDirection, line: i)
         }
+        
+        generateRandomCell(count: 1)
     }
 }
 

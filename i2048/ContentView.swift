@@ -19,11 +19,20 @@ struct Cell {
     var number: Int
     var x: Int
     var y: Int
+    var merged: Bool = false
 }
 
 struct MergeData {
     var FromId: Int
     var ToId: Int
+    var number: Int
+}
+
+struct MoveData {
+    var id: Int
+    var toX: Int
+    var toY: Int
+    var merged: Bool = false
 }
 
 struct ContentView: View {
@@ -34,6 +43,7 @@ struct ContentView: View {
     let CELL_PADDING: CGFloat = 12
     let CELL_TEXT_SIZE: CGFloat = 32
     let RANDOM_NUMBER_CHANCE: Double = 0.9
+    let MOVE_DURATION: Double = 0.2
     
 //    次に割り振るID (連番)
     @State private var generatedId: Int = 0
@@ -48,21 +58,21 @@ struct ContentView: View {
     
 //    既に数字のあるマスの一覧 (アニメーション用)
     @State private var Cells: [Cell] = [
-//        Cell(id: 0, number: 2, x: 0, y: 0),
-//        Cell(id: 1, number: 4, x: 1, y: 0),
-//        Cell(id: 2, number: 4, x: 2, y: 0),
-//        Cell(id: 3, number: 16, x: 3, y: 0),
-//        Cell(id: 4, number: 32, x: 0, y: 1),
-//        Cell(id: 5, number: 32, x: 1, y: 1),
-//        Cell(id: 6, number: 128, x: 2, y: 1),
-//        Cell(id: 7, number: 256, x: 3, y: 1),
-//        Cell(id: 8, number: 512, x: 0, y: 2),
-//        Cell(id: 9, number: 32, x: 1, y: 2),
-//        Cell(id: 10, number: 2048, x: 2, y: 2),
-//        Cell(id: 11, number: 2, x: 0, y: 3),
-//        Cell(id: 12, number: 2, x: 1, y: 3),
-//        Cell(id: 13, number: 2, x: 2, y: 3),
-//        Cell(id: 14, number: 2, x: 3, y: 3),
+        Cell(id: 0, number: 2, x: 0, y: 0),
+        Cell(id: 1, number: 4, x: 1, y: 0),
+        Cell(id: 2, number: 4, x: 2, y: 0),
+        Cell(id: 3, number: 16, x: 3, y: 0),
+        Cell(id: 4, number: 32, x: 0, y: 1),
+        Cell(id: 5, number: 32, x: 1, y: 1),
+        Cell(id: 6, number: 128, x: 2, y: 1),
+        Cell(id: 7, number: 256, x: 3, y: 1),
+        Cell(id: 8, number: 512, x: 0, y: 2),
+        Cell(id: 9, number: 32, x: 1, y: 2),
+        Cell(id: 10, number: 2048, x: 2, y: 2),
+        Cell(id: 11, number: 2, x: 0, y: 3),
+        Cell(id: 12, number: 2, x: 1, y: 3),
+        Cell(id: 13, number: 2, x: 2, y: 3),
+        Cell(id: 14, number: 2, x: 3, y: 3),
     ]
         
 //    メインビュー
@@ -98,9 +108,7 @@ struct ContentView: View {
 //            }
             
 //            数字のあるマスの描画
-            ForEach(0..<Cells.count, id: \.self) { i in
-                let cell = Cells[i]
-                
+            ForEach(Cells/*.filter { !$0.merged }*/, id: \.id) { cell in
 //                盤の真ん中を取得
                 let center = Double(BOARD_SIZE - 1) / 2
                 
@@ -131,16 +139,16 @@ struct ContentView: View {
                     handleSwipe(translationX: gesture.translation.width, translationY: gesture.translation.height)
                 }
         )
-        .onAppear {
-            if Cells.isEmpty {
-                generateRandomCell(count: 2)
-            }
-        }
+//        .onAppear {
+//            if Cells.isEmpty {
+//                generateRandomCell(count: 2)
+//            }
+//        }
     }
     
 //    マスのインデックス内の乱数を生成
     func generateRandomCell(count: Int) {
-        for i in 0..<count {
+        for _ in 0..<count {
             while (true) {
                 let x = Int.random(in: 0..<BOARD_SIZE)
                 let y = Int.random(in: 0..<BOARD_SIZE)
@@ -163,7 +171,7 @@ struct ContentView: View {
 //    }
     
 //    指定した方向へ指定したラインを動かす
-    func move(direction: Direction, line: Int) -> [MergeData] {
+    func calcMerge(direction: Direction, line: Int) -> [MergeData] {
 //        動かす列(行)をソートして取得
         let line: [Cell] = getSortedLine(direction: direction, line: line)
         
@@ -176,9 +184,17 @@ struct ContentView: View {
 //            既に結合済みならスキップ
             if merged.contains(where: {$0.FromId == line[i].id}) { continue }
             
-//            条件を満たしていたら結合
+//            条件を満たしていたら結合し，結合済みであることをマーク
             if line[i].number == line[i+1].number {
-                merged.append(MergeData(FromId: line[i+1].id, ToId: line[i].id))
+                if let index = findCellIndexById(id: line[i+1].id) {
+                    Cells[index].merged = true
+                    Cells[index].x = line[i].x
+                    Cells[index].y = line[i].y
+                }
+                if let index = findCellIndexById(id: line[i].id) {
+                    Cells[index].number *= 2
+                }
+                merged.append(MergeData(FromId: line[i+1].id, ToId: line[i].id, number: line[i].number))
             }
         }
         
@@ -186,32 +202,49 @@ struct ContentView: View {
     }
     
     
-    func alignCells(direction: Direction, line: Int) {
-        // 揃える列または行をソートして取得
-        let line = getSortedLine(direction: direction, line: line)
+    func alignCells(direction: Direction, lineNum: Int) -> [MoveData] {
+        var moves: [MoveData] = []
+//        揃える列または行をソートして取得
+        let line = getLine(direction: direction, line: lineNum).filter { !$0.merged }
+//        print(line)
         
-        // 並べる方向に応じてインデックスの並び順を決める
-        let range: [Int] = (direction == .up || direction == .left)
-            ? Array(0..<BOARD_SIZE)
-            : Array((0..<BOARD_SIZE).reversed())
-
-        // line.count 分だけ range を使う（index out of range を防ぐ）
-        for (j, cell) in line.enumerated() {
-            if j >= range.count { break } // 念のため安全に
-
-            if let index = findCellIndexById(id: cell.id) {
+        let invert = !(direction == .up || direction == .left)
+//        並べる方向に応じてインデックスの並び順を決める
+        let range: [Int] = !invert
+            ? Array(0..<line.count)
+            : Array((0..<line.count).reversed())
+        
+        for (count, i) in range.enumerated() {
+            if count >= line.count { break }
+//            print("\(direction): (\(count), \(i))")
+            if let index = findCellIndexById(id: line[i].id) {
+                let cell = Cells[index]
                 if direction == .up || direction == .down {
-                    moveCellTo(id: cell.id, x: cell.x, y: range[j])
-                    Cells[index].y = range[j]
+                    moves.append(MoveData(id: cell.id, toX: cell.x, toY: invert ? BOARD_SIZE - count - 1 : count))
+//                    Cells[index].y = invert ? BOARD_SIZE - count - 1 : count
                 } else {
-                    moveCellTo(id: cell.id, x: range[j], y: cell.y)
-                    Cells[index].x = range[j]
+                    moves.append(MoveData(id: cell.id, toX: invert ? BOARD_SIZE - count - 1 : count, toY: cell.y))
+//                    Cells[index].x = invert ? BOARD_SIZE - count - 1 : count
                 }
             }
         }
+//        print(getLine(direction: direction, line: lineNum).filter{ !$0.merged })
+        return moves
     }
     
-    
+    func getLine(direction: Direction, line: Int) -> [Cell] {
+//        同一列(行)をフィルタリングするためのクロージャ
+        let filterClosureMap: [Direction: (Cell) -> Bool] = [
+            .up: { (cell: Cell) -> Bool in cell.x == line },
+            .down: { (cell: Cell) -> Bool in cell.x == line },
+            .right: { (cell: Cell) -> Bool in cell.y == line },
+            .left: { (cell: Cell) -> Bool in cell.y == line },
+        ]
+
+//        選択した列(行)をして取得
+        return Cells
+            .filter(filterClosureMap[direction]!)
+    }
 
     func getSortedLine(direction: Direction, line: Int) -> [Cell] {
 //        同一列(行)をフィルタリングするためのクロージャ
@@ -236,36 +269,51 @@ struct ContentView: View {
             .sorted(by: sortClosureMap[direction]!)
     }
     
-    func mergeCells(direction: Direction) {
-        for i in 0..<BOARD_SIZE {
-            let merged = move(direction: direction, line: i)
-            
-            if merged.count == 0 {
-                alignCells(direction: direction, line: i)
-                continue
-            }
+    func move(direction: Direction) {
+        var moves: [MoveData] = []
         
-            for i in 0..<merged.count {
-                let cellFrom = findCellById(id: merged[i].FromId)!
-                let cellTo = findCellById(id: merged[i].ToId)!
-
-                moveCellTo(id: cellFrom.id, x: cellTo.x, y: cellTo.y, onFinish: {
-//                    マスの数字を結合し，マスの配列から削除
-                    if let cellIndex = findCellIndexById(id: cellTo.id) {
-                        Cells[cellIndex].number *= 2
-                        deleteCellById(id: cellFrom.id)
-                        alignCells(direction: direction, line: i)
-                    }
-                })
+        for i in 0..<BOARD_SIZE {
+            let merged = calcMerge(direction: direction, line: i)
+            let aligned = alignCells(direction: direction, lineNum: i)
+            
+//            結合されるマスを移動情報に変換
+            for j in 0..<merged.count {
+                if let move = getMoveFromMergeData(merge: merged[j]) {
+                    moves.append(move)
+                }
+            }
+            for j in 0..<aligned.count {
+                moves.append(aligned[j])
             }
         }
-        generateRandomCell(count: 1)
+        print("移動予定：")
+        print(moves)
+        
+        for i in 0..<moves.count {
+            if moves[i].merged {
+                moveCellTo(id: moves[i].id, x: moves[i].toX, y: moves[i].toY, onFinish: {
+                    deleteCellById(id: moves[i].id)
+                })
+            } else {
+                moveCellTo(id: moves[i].id, x: moves[i].toX, y: moves[i].toY)
+            }
+        }
+    }
+    
+
+    func getMoveFromMergeData(merge: MergeData) -> MoveData? {
+        if let cellFrom = findCellById(id: merge.FromId),
+           let cellTo = findCellById(id: merge.ToId)
+        {
+            return MoveData(id: cellFrom.id, toX: cellTo.x, toY: cellTo.y, merged: true)
+        }
+        return nil
     }
 
 //    アニメーション付きでマスを移動する関数
     func moveCellTo(id: Int, x: Int, y: Int, onFinish: (() -> Void)? = nil) {
         if let index = Cells.firstIndex(where: { $0.id == id }) {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(.easeInOut(duration: MOVE_DURATION)) {
                 Cells[index].x = x
                 Cells[index].y = y
             } completion: {
@@ -285,6 +333,7 @@ struct ContentView: View {
     func findCellIndexById(id: Int) -> Int? {
         return Cells.firstIndex(where: { $0.id == id })
     }
+
     
 //    IDでマスを削除する関数
     func deleteCellById(id: Int) {
@@ -321,8 +370,25 @@ struct ContentView: View {
         }
         
 
-//            print("\(i+1)行目：\(merged)")
-            mergeCells(direction: swipeDirection)
+        move(direction: swipeDirection)
+    }
+    
+    func dumpField() {
+        var field: [[Int?]] = Array(
+            repeating: Array(repeating: nil, count: BOARD_SIZE),
+            count: BOARD_SIZE
+        )
+        for cell in Cells {
+            field[cell.y][cell.x] = cell.number
+        }
+        
+        for i in 0..<BOARD_SIZE {
+            for j in 0..<BOARD_SIZE {
+                print((field[i][j] != nil) ? String(format: "%5d", field[i][j]!) : ".", terminator: " ")
+            }
+            print()
+        }
+        print()
     }
 }
 

@@ -204,31 +204,19 @@ struct ContentView: View {
     
     func alignCells(direction: Direction, lineNum: Int) -> [MoveData] {
         var moves: [MoveData] = []
-//        揃える列または行をソートして取得
-        let line = getLine(direction: direction, line: lineNum).filter { !$0.merged }
-//        print(line)
+//        揃える列または行をソートして取得（merged = falseのもののみ）
+        let sortedLine = getSortedLine(direction: direction, line: lineNum).filter { !$0.merged }
         
         let invert = !(direction == .up || direction == .left)
-//        並べる方向に応じてインデックスの並び順を決める
-        let range: [Int] = !invert
-            ? Array(0..<line.count)
-            : Array((0..<line.count).reversed())
         
-        for (count, i) in range.enumerated() {
-            if count >= line.count { break }
-//            print("\(direction): (\(count), \(i))")
-            if let index = findCellIndexById(id: line[i].id) {
-                let cell = Cells[index]
-                if direction == .up || direction == .down {
-                    moves.append(MoveData(id: cell.id, toX: cell.x, toY: invert ? BOARD_SIZE - count - 1 : count))
-//                    Cells[index].y = invert ? BOARD_SIZE - count - 1 : count
-                } else {
-                    moves.append(MoveData(id: cell.id, toX: invert ? BOARD_SIZE - count - 1 : count, toY: cell.y))
-//                    Cells[index].x = invert ? BOARD_SIZE - count - 1 : count
-                }
+        for (count, cell) in sortedLine.enumerated() {
+//            print("\(direction): (\(count), \(cell.id))")
+            if direction == .up || direction == .down {
+                moves.append(MoveData(id: cell.id, toX: cell.x, toY: invert ? BOARD_SIZE - count - 1 : count))
+            } else {
+                moves.append(MoveData(id: cell.id, toX: invert ? BOARD_SIZE - count - 1 : count, toY: cell.y))
             }
         }
-//        print(getLine(direction: direction, line: lineNum).filter{ !$0.merged })
         return moves
     }
     

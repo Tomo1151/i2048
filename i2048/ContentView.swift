@@ -33,6 +33,7 @@ struct MoveData {
     var toX: Int
     var toY: Int
     var merged: Bool = false
+    var toId: Int?
 }
 
 struct ContentView: View {
@@ -44,35 +45,28 @@ struct ContentView: View {
     let CELL_TEXT_SIZE: CGFloat = 32
     let RANDOM_NUMBER_CHANCE: Double = 0.9
     let MOVE_DURATION: Double = 0.2
-    
+
 //    次に割り振るID (連番)
     @State private var generatedId: Int = 0
-    
-////    盤面チェック用配列
-//    @State private var board: [[Int?]] = [
-//        [nil, nil, nil, nil],
-//        [nil, nil, nil, nil],
-//        [nil, nil, nil, nil],
-//        [nil, nil, nil, nil],
-//    ]
-    
+
+
 //    既に数字のあるマスの一覧 (アニメーション用)
     @State private var Cells: [Cell] = [
-        Cell(id: 0, number: 2, x: 0, y: 0),
-        Cell(id: 1, number: 4, x: 1, y: 0),
-        Cell(id: 2, number: 4, x: 2, y: 0),
-        Cell(id: 3, number: 16, x: 3, y: 0),
-        Cell(id: 4, number: 32, x: 0, y: 1),
-        Cell(id: 5, number: 32, x: 1, y: 1),
-        Cell(id: 6, number: 128, x: 2, y: 1),
-        Cell(id: 7, number: 256, x: 3, y: 1),
-        Cell(id: 8, number: 512, x: 0, y: 2),
-        Cell(id: 9, number: 32, x: 1, y: 2),
-        Cell(id: 10, number: 2048, x: 2, y: 2),
-        Cell(id: 11, number: 2, x: 0, y: 3),
-        Cell(id: 12, number: 2, x: 1, y: 3),
-        Cell(id: 13, number: 2, x: 2, y: 3),
-        Cell(id: 14, number: 2, x: 3, y: 3),
+    //    Cell(id: 0, number: 2, x: 0, y: 0),
+    //    Cell(id: 1, number: 4, x: 1, y: 0),
+    //    Cell(id: 2, number: 4, x: 2, y: 0),
+    //    Cell(id: 3, number: 16, x: 3, y: 0),
+    //    Cell(id: 4, number: 32, x: 0, y: 1),
+    //    Cell(id: 5, number: 32, x: 1, y: 1),
+    //    Cell(id: 6, number: 128, x: 2, y: 1),
+    //    Cell(id: 7, number: 256, x: 3, y: 1),
+    //    Cell(id: 8, number: 512, x: 0, y: 2),
+    //    Cell(id: 9, number: 32, x: 1, y: 2),
+    //    Cell(id: 10, number: 2048, x: 2, y: 2),
+    //    Cell(id: 11, number: 2, x: 0, y: 3),
+    //    Cell(id: 12, number: 2, x: 1, y: 3),
+    //    Cell(id: 13, number: 2, x: 2, y: 3),
+    //    Cell(id: 14, number: 2, x: 3, y: 3),
     ]
         
 //    メインビュー
@@ -139,11 +133,11 @@ struct ContentView: View {
                     handleSwipe(translationX: gesture.translation.width, translationY: gesture.translation.height)
                 }
         )
-//        .onAppear {
-//            if Cells.isEmpty {
-//                generateRandomCell(count: 2)
-//            }
-//        }
+        .onAppear {
+            if Cells.isEmpty {
+                generateRandomCell(count: 2)
+            }
+        }
     }
     
 //    マスのインデックス内の乱数を生成
@@ -188,11 +182,6 @@ struct ContentView: View {
             if line[i].number == line[i+1].number {
                 if let index = findCellIndexById(id: line[i+1].id) {
                     Cells[index].merged = true
-                    Cells[index].x = line[i].x
-                    Cells[index].y = line[i].y
-                }
-                if let index = findCellIndexById(id: line[i].id) {
-                    Cells[index].number *= 2
                 }
                 merged.append(MergeData(FromId: line[i+1].id, ToId: line[i].id, number: line[i].number))
             }
@@ -210,11 +199,21 @@ struct ContentView: View {
         let invert = !(direction == .up || direction == .left)
         
         for (count, cell) in sortedLine.enumerated() {
-//            print("\(direction): (\(count), \(cell.id))")
+            var toX: Int
+            var toY: Int
+            
             if direction == .up || direction == .down {
-                moves.append(MoveData(id: cell.id, toX: cell.x, toY: invert ? BOARD_SIZE - count - 1 : count))
+                toX = cell.x
+                toY = invert ? BOARD_SIZE - count - 1 : count
+//                moves.append(MoveData(id: cell.id, toX: cell.x, toY: invert ? BOARD_SIZE - count - 1 : count))
             } else {
-                moves.append(MoveData(id: cell.id, toX: invert ? BOARD_SIZE - count - 1 : count, toY: cell.y))
+                toX = invert ? BOARD_SIZE - count - 1 : count
+                toY = cell.y
+//                moves.append(MoveData(id: cell.id, toX: invert ? BOARD_SIZE - count - 1 : count, toY: cell.y))
+            }
+            
+            if toX != cell.x || toY != cell.y {
+                moves.append(MoveData(id: cell.id, toX: toX, toY: toY))
             }
         }
         return moves
@@ -264,9 +263,9 @@ struct ContentView: View {
             let merged = calcMerge(direction: direction, line: i)
             let aligned = alignCells(direction: direction, lineNum: i)
             
-//            結合されるマスを移動情報に変換
+//            結合されるマスを移動情報に変換（移動後の座標を考慮）
             for j in 0..<merged.count {
-                if let move = getMoveFromMergeData(merge: merged[j]) {
+                if let move = getMoveFromMergeData(merge: merged[j], alignedMoves: aligned) {
                     moves.append(move)
                 }
             }
@@ -274,26 +273,61 @@ struct ContentView: View {
                 moves.append(aligned[j])
             }
         }
+        
+        if moves.count == 0 { return }
+        
         print("移動予定：")
         print(moves)
         
-        for i in 0..<moves.count {
-            if moves[i].merged {
-                moveCellTo(id: moves[i].id, x: moves[i].toX, y: moves[i].toY, onFinish: {
-                    deleteCellById(id: moves[i].id)
-                })
-            } else {
-                moveCellTo(id: moves[i].id, x: moves[i].toX, y: moves[i].toY)
+        // すべてのアニメーションが完了したかを追跡
+        var completedAnimations = 0
+        let totalAnimations = moves.count
+        
+        // アニメーション完了時の処理
+        let onAnimationComplete = {
+            completedAnimations += 1
+            
+            // すべてのアニメーションが完了した時
+            if completedAnimations == totalAnimations {
+                // マージ処理を一括実行
+                for move in moves {
+                    if move.merged {
+                        // マージされたセルを削除
+                        self.deleteCellById(id: move.id)
+                        // 目標セルの数字を2倍にする
+                        if let toId = move.toId, let index = self.findCellIndexById(id: toId) {
+                            self.Cells[index].number *= 2
+                        }
+                    }
+                }
+                
+                // 新しいセルを生成
+                self.generateRandomCell(count: 1)
             }
+        }
+        
+        // すべてのセルを移動
+        for move in moves {
+            moveCellTo(id: move.id, x: move.toX, y: move.toY, onFinish: onAnimationComplete)
         }
     }
     
 
-    func getMoveFromMergeData(merge: MergeData) -> MoveData? {
+    func getMoveFromMergeData(merge: MergeData, alignedMoves: [MoveData]) -> MoveData? {
         if let cellFrom = findCellById(id: merge.FromId),
            let cellTo = findCellById(id: merge.ToId)
         {
-            return MoveData(id: cellFrom.id, toX: cellTo.x, toY: cellTo.y, merged: true)
+            // マージ対象のセル（ToId）が移動する場合、その移動後の座標を取得
+            var targetX = cellTo.x
+            var targetY = cellTo.y
+            
+            // alignedMovesから目標セルの移動先を探す
+            if let alignedMove = alignedMoves.first(where: { $0.id == merge.ToId }) {
+                targetX = alignedMove.toX
+                targetY = alignedMove.toY
+            }
+            
+            return MoveData(id: cellFrom.id, toX: targetX, toY: targetY, merged: true, toId: cellTo.id)
         }
         return nil
     }

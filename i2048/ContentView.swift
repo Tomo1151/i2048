@@ -7,6 +7,12 @@
 
 import SwiftUI
 
+enum GameState {
+    case ingame
+    case gameover
+    case gameclear
+}
+
 // 方向のenum
 enum Direction {
     case up
@@ -41,26 +47,37 @@ struct MoveData {
 }
 
 struct ContentView: View {
-    //    盤面のサイズ
+//    盤面のサイズ
     let BOARD_SIZE: Int = 4
     
-    //    描画サイズ
+//    描画サイズ
     let BOARD_PADDING: CGFloat = 10
+    let BOARD_MARGIN: CGFloat = 40
     let CELL_SIZE: CGFloat = 50
     let CELL_PADDING: CGFloat = 12
     let CELL_TEXT_SIZE: CGFloat = 32
+    let SCORE_TEXT_SIZE: CGFloat = 20
+    let GAMEOVER_TEXT_SIZE: CGFloat = 45
     
-    //    生成されるマスが2である確率
+//    生成されるマスが2である確率
     let RANDOM_NUMBER_CHANCE: Double = 0.9
     
-    //    移動アニメーションの長さ
+//    移動アニメーションの長さ
     let MOVE_DURATION: Double = 0.2
     
-    //    次生成するマスに割り振るID (連番)
+//    次生成するマスに割り振るID (連番)
     @State private var generatedId: Int = 0
     
+//    スコア
+    @State private var score: Int = 0
     
-    //    有効なマスの一覧 (アニメーション用)
+    @State private var gameState: GameState = .ingame
+    
+    @State private var blurValue: CGFloat = 0.0
+    let BLUR_MAX_VALUE: CGFloat = 4.0
+    let BLUR_DURATION: Double = 1.0
+    
+//    有効なマスの一覧 (アニメーション用)
     @State private var Cells: [Cell] = [
         //    Cell(id: 0, number: 2, x: 0, y: 0),
         //    Cell(id: 1, number: 4, x: 1, y: 0),
@@ -79,74 +96,96 @@ struct ContentView: View {
         //    Cell(id: 14, number: 2, x: 3, y: 3),
     ]
     
-    //    メインビュー
+//    メインビュー
     var body: some View {
         ZStack {
-            //            背景色
-            Color("body_bg").edgesIgnoringSafeArea(.all)
-            
-            //            背景の枠/マスの描画
-            VStack {
-                ForEach(0..<BOARD_SIZE, id: \.self) { i in
-                    HStack {
-                        ForEach(0..<BOARD_SIZE, id: \.self) { j in
-                            Text("")
-                                .frame(width: CELL_SIZE, height: CELL_SIZE, alignment: .center)
-                                .padding(CELL_PADDING)
-                                .background(Color("cell_bg_empty"))
-                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .shadow(color: .brown, radius: 3, x: 2, y: 2)
-                                .fontWeight(.heavy)
+            VStack{
+                VStack{
+                    ZStack {
+                        //                背景の枠/マスの描画
+                        VStack {
+                            ForEach(0..<BOARD_SIZE, id: \.self) { i in
+                                HStack {
+                                    ForEach(0..<BOARD_SIZE, id: \.self) { j in
+                                        Text("")
+                                            .frame(width: CELL_SIZE, height: CELL_SIZE, alignment: .center)
+                                            .padding(CELL_PADDING)
+                                            .background(Color("cell_bg_empty"))
+                                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                            .shadow(color: .brown, radius: 3, x: 2, y: 2)
+                                            .fontWeight(.heavy)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(BOARD_PADDING)
+                        .background(Color("board_bg"))
+                        .fontDesign(.monospaced)
+                        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                        
+                        
+                        //                数字のあるマスの描画
+                        ForEach(Cells, id: \.id) { cell in
+                            //                盤の真ん中を計算
+                            let center = Double(BOARD_SIZE - 1) / 2
+                            
+                            //                マスの(x, y)をもとに描画位置を計算
+                            let posX = -((CELL_SIZE + CELL_TEXT_SIZE) / 2) * CGFloat(center - Double(cell.x)) * 2
+                            let posY = -((CELL_SIZE + CELL_TEXT_SIZE) / 2) * CGFloat(center - Double(cell.y)) * 2
+                            
+                            //                    数字が存在するマスを上から描画
+                            ZStack {
+                                Text(String(cell.number))
+                                    .frame(width: CELL_SIZE, height: CELL_SIZE, alignment: .center)
+                                    .padding(CELL_PADDING)
+                                    .foregroundColor(cell.number  < 8 ? Color("cell_text_black") : Color("cell_text_white"))
+                                    .background(Color("cell_bg_\(cell.number)"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    .fontWeight(.heavy)
+                                    .font(.system(size: 32))
+                                    .minimumScaleFactor(0.3)
+                                    .lineLimit(1)
+                                    .offset(x: posX, y: posY)
+                            }
+                        }
+                    }
+                    .gesture(
+                        DragGesture()
+                            .onEnded { gesture in
+                                //                    スワイプの検知
+                                handleSwipe(translationX: gesture.translation.width, translationY: gesture.translation.height)
+                            }
+                    )
+                    .onAppear {
+                        //                盤面初回描画時にランダムで2マス生成
+                        if Cells.isEmpty {
+                            generateRandomCell(count: 2)
                         }
                     }
                 }
+                .padding(.top, BOARD_MARGIN*2 + SCORE_TEXT_SIZE)
+                
+                Text("Score: \(score)")
+                    .padding(.vertical, BOARD_MARGIN)
+                    .fontWeight(.bold)
+                    .font(.system(size: SCORE_TEXT_SIZE))
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(Color("board_bg"))
             }
-            .padding(BOARD_PADDING)
-            .background(Color("board_bg"))
-            .fontDesign(.monospaced)
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .blur(radius: blurValue)
             
-            //            数字のあるマスの描画
-            ForEach(Cells, id: \.id) { cell in
-                //                盤の真ん中を計算
-                let center = Double(BOARD_SIZE - 1) / 2
-                
-                //                マスの(x, y)をもとに描画位置を計算
-                let posX = -((CELL_SIZE + CELL_TEXT_SIZE) / 2) * CGFloat(center - Double(cell.x)) * 2
-                let posY = -((CELL_SIZE + CELL_TEXT_SIZE) / 2) * CGFloat(center - Double(cell.y)) * 2
-                
-                //                数字が存在するマスを上から描画
-                ZStack {
-                    Text(String(cell.number))
-                        .frame(width: CELL_SIZE, height: CELL_SIZE, alignment: .center)
-                        .padding(CELL_PADDING)
-                        .foregroundColor(cell.number  < 8 ? Color("cell_text_black") : Color("cell_text_white"))
-                        .background(Color("cell_bg_\(cell.number)"))
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .fontWeight(.heavy)
-                        .font(.system(size: 32))
-                        .minimumScaleFactor(0.3)
-                        .lineLimit(1)
-                        .offset(x: posX, y: posY)
-                }
-            }
-        }
-        .gesture(
-            DragGesture()
-                .onEnded { gesture in
-                    //                    スワイプの検知
-                    handleSwipe(translationX: gesture.translation.width, translationY: gesture.translation.height)
-                }
-        )
-        .onAppear {
-            //            盤面初回描画時にランダムで2マス生成
-            if Cells.isEmpty {
-                generateRandomCell(count: 2)
+            if gameState == .gameover {
+                Text("ゲームオーバー\n(๑•ૅㅁ•๑)")
+                    .multilineTextAlignment(.center)
+                    .fontWeight(.heavy)
+                    .font(.system(size: GAMEOVER_TEXT_SIZE))
+                    .foregroundStyle(Color("cell_text_black"))
+                    .shadow(color: Color(.white), radius: 10)
             }
         }
     }
     
-    //    マスのインデックス内の乱数を生成
+//    マスのインデックス内の乱数を生成
     func generateRandomCell(count: Int) {
         for _ in 0..<count {
             while (true) {
@@ -163,7 +202,7 @@ struct ContentView: View {
         }
     }
     
-    //    指定したライン上のマスが指定した方向に動いた時に結合が起こるマスを計算
+//    指定したライン上のマスが指定した方向に動いた時に結合が起こるマスを計算
     func calcMerge(direction: Direction, line: Int) -> [MergeData] {
         //        動かす列(行)をソートして取得
         let line: [Cell] = getSortedLine(direction: direction, line: line)
@@ -191,8 +230,37 @@ struct ContentView: View {
         return merged
     }
     
+//    指定した方向に動いた時に1列(行)以上結合が起こるかどうかを検証
+    func checkMerge(direction: Direction) -> Bool {
+        
+        for i in 0..<BOARD_SIZE {
+            //        動かす列(行)をソートして取得
+            let line: [Cell] = getSortedLine(direction: direction, line: i)
+            if line.count < 2 { return true }
+            
+            //        マスを結合
+            for j in 0..<(line.count-1) {
+                //            条件を満たしていたら結合し，結合済みであることをマーク
+                if line[j].number == line[j+1].number {
+                    return true
+                }
+            }
+        }
+        
+        return false
+    }
     
-    //    指定したライン上のマスを指定した方向に動かした時にマスを端っこから詰める
+    // 指定した方向に動いた時にマスの移動が起こるかどうかを検証
+    func checkAlign(direction: Direction) -> Bool {
+        var moves: [MoveData] = []
+        for i in 0..<BOARD_SIZE {
+            moves += alignCells(direction: direction, lineNum: i)
+        }
+        return moves.count != 0
+    }
+    
+    
+//    指定したライン上のマスを指定した方向に動かした時にマスを端っこから詰める
     func alignCells(direction: Direction, lineNum: Int) -> [MoveData] {
         //        移動予定マス一覧
         var moves: [MoveData] = []
@@ -225,7 +293,7 @@ struct ContentView: View {
         return moves
     }
     
-    //    指定したライン上のマスを指定した向きでソートして取得
+//    指定したライン上のマスを指定した向きでソートして取得
     func getSortedLine(direction: Direction, line: Int) -> [Cell] {
         //        方向別フィルタリング条件のクロージャ
         let filterClosureMap: [Direction: (Cell) -> Bool] = [
@@ -249,9 +317,7 @@ struct ContentView: View {
             .sorted(by: sortClosureMap[direction]!)
     }
     
-    //    実際に移動計画を立てて移動を行う
-    func move(direction: Direction) {
-        //        移動予定のマス一覧
+    func calcMoves(direction: Direction) -> [MoveData] {
         var moves: [MoveData] = []
         
         for i in 0..<BOARD_SIZE {
@@ -273,18 +339,26 @@ struct ContentView: View {
                 moves.append(aligned[j])
             }
         }
+
+        return moves
+    }
+    
+//    実際に移動計画を立てて移動を行う
+    func move(direction: Direction) {
+        //        移動予定のマス一覧
+        let moves: [MoveData] = calcMoves(direction: direction)
         
-        //        移動予定マスが0だった時は何もしない
+//        移動予定マスが0だった時は何もしない
         if moves.count == 0 { return }
         
         print("移動予定：")
         print(moves)
         
-        // すべてのアニメーションが完了したかを追跡
+// すべてのアニメーションが完了したかを追跡
         var completedAnimations = 0
         let totalAnimations = moves.count
         
-        // すべてのセルを移動
+// すべてのセルを移動
         for move in moves {
             //            移動予定を元にアニメーション付きで移動
             moveCellTo(id: move.id, x: move.toX, y: move.toY, onFinish: {
@@ -301,12 +375,19 @@ struct ContentView: View {
                             // 結合された側のマスの数字を2倍にする
                             if let toId = move.toId, let index = self.findCellIndexById(id: toId) {
                                 Cells[index].number *= 2
+                                score += Cells[index].number
                             }
                         }
                     }
                     
                     // 新しいセルを生成
                     generateRandomCell(count: 1)
+                    
+                    // ゲームオーバー判定
+                    if isGameover() {
+                        gameState = .gameover
+                        showGameoverScreen()
+                    }
                 }
             })
         }
@@ -345,6 +426,21 @@ struct ContentView: View {
                     handler()
                 }
             }
+        }
+    }
+    
+    // ゲームオーバー判定
+    func isGameover() -> Bool {
+        return
+          !(checkAlign(direction: .up) || checkMerge(direction: .up) ||
+            checkAlign(direction: .down) || checkMerge(direction: .down) ||
+            checkAlign(direction: .left) || checkMerge(direction: .left) ||
+            checkAlign(direction: .right) || checkMerge(direction: .right))
+    }
+    
+    func showGameoverScreen() {
+        withAnimation(.easeInOut(duration: BLUR_DURATION)) {
+            blurValue = BLUR_MAX_VALUE
         }
     }
     

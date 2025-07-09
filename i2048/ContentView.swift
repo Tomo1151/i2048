@@ -48,7 +48,7 @@ struct MoveData {
 
 struct ContentView: View {
 //    盤面のサイズ
-    let BOARD_SIZE: Int = 4
+    let BOARD_SIZE: Int = 2
     
 //    描画サイズ
     let BOARD_PADDING: CGFloat = 10
@@ -77,6 +77,10 @@ struct ContentView: View {
     let BLUR_MAX_VALUE: CGFloat = 4.0
     let BLUR_DURATION: Double = 1.0
     
+    @State private var opacityValue: CGFloat = 0.0
+    let OPACITY_MAX_VALUE: CGFloat = 1.0
+    let OPACITY_DURATION: Double = 1.75
+    
 //    有効なマスの一覧 (アニメーション用)
     @State private var Cells: [Cell] = [
         //    Cell(id: 0, number: 2, x: 0, y: 0),
@@ -99,6 +103,7 @@ struct ContentView: View {
 //    メインビュー
     var body: some View {
         ZStack {
+            Color.bodyBg.edgesIgnoringSafeArea(.all)
             VStack{
                 VStack{
                     ZStack {
@@ -157,10 +162,7 @@ struct ContentView: View {
                             }
                     )
                     .onAppear {
-                        //                盤面初回描画時にランダムで2マス生成
-                        if Cells.isEmpty {
-                            generateRandomCell(count: 2)
-                        }
+                        initGame()
                     }
                 }
                 .padding(.top, BOARD_MARGIN*2 + SCORE_TEXT_SIZE)
@@ -175,12 +177,31 @@ struct ContentView: View {
             .blur(radius: blurValue)
             
             if gameState == .gameover {
-                Text("ゲームオーバー\n(๑•ૅㅁ•๑)")
-                    .multilineTextAlignment(.center)
-                    .fontWeight(.heavy)
-                    .font(.system(size: GAMEOVER_TEXT_SIZE))
-                    .foregroundStyle(Color("cell_text_black"))
-                    .shadow(color: Color(.white), radius: 10)
+                VStack {
+                    Text("ゲームオーバー\n(๑•ૅㅁ•๑)")
+                        .multilineTextAlignment(.center)
+                        .fontWeight(.heavy)
+                        .font(.system(size: GAMEOVER_TEXT_SIZE))
+                        .foregroundStyle(Color("cell_text_black"))
+                        .shadow(color: Color(.white), radius: 10)
+                    HStack {
+                        Button("もういちど") {
+                            resetGame()
+                        }
+                        .frame(width: 200, height: 50)
+                        .background(
+                            RoundedRectangle(cornerRadius: 25)
+                                .fill(Color("cell_bg_2")) // 背景色
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 25)
+                                .stroke(Color("cell_text_black"), lineWidth: 4) // ボーダー
+                        )
+                        .foregroundStyle(Color("cell_text_black")) // 文字色
+                        .fontWeight(.bold)
+                        .font(.system(size: 24))
+                    }
+                }.opacity(opacityValue)
             }
         }
     }
@@ -438,10 +459,34 @@ struct ContentView: View {
             checkAlign(direction: .right) || checkMerge(direction: .right))
     }
     
+    // ゲームオーバー表示
     func showGameoverScreen() {
+//        Thread.sleep(forTimeInterval: 1.0)
         withAnimation(.easeInOut(duration: BLUR_DURATION)) {
             blurValue = BLUR_MAX_VALUE
         }
+        withAnimation(.easeInOut(duration: OPACITY_DURATION)) {
+            opacityValue = OPACITY_MAX_VALUE
+        }
+    }
+    
+    // ゲーム状態初期化
+    func initGame() {
+        // ランダムな位置に2マス生成
+        if Cells.isEmpty {
+            generateRandomCell(count: 2)
+        }
+    }
+    
+    // ゲーム状態リセット
+    func resetGame() {
+        generatedId = 0
+        score = 0
+        gameState = .ingame
+        blurValue = 0
+        opacityValue = 0
+        Cells.removeAll()
+        initGame()
     }
     
     //    IDからマスを取得する関数
